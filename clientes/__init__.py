@@ -1,6 +1,11 @@
 from layouts import *
 from bd import *
 import matplotlib.pyplot as plt
+import torch
+from torchvision import models, transforms
+from PIL import Image
+from PyQt5.QtWidgets import QApplication, QFileDialog
+import sys
 
 def menuCliente(texto):
     while True:
@@ -141,22 +146,29 @@ def pesquisarProd(cid):
         print(f'  Tela de pesquisa de produtos | {clientes[cid][2]}')
         print((50 * '-') + f'{CEND}')
         print(f'\nPelo o que você deseja pesquisar?')
-        print('\n[1] - Nome\n[2] - Descrição\n[3] - Ver gráfico dos 5 itens mais pesquisados\n[0] - Voltar ao menu anterior')
+        print('\n[1] - Nome\n[2] - Descrição\n[3] - Por imagem\n[4] - Ver gráfico dos 5 itens mais pesquisados\n[0] - Voltar ao menu anterior')
         opcao = str(input('\nDigite a opcao desejada: '))
         if (opcao == '1'):
             resultPesquisaProd(1, 'no nome', cid)
         elif (opcao == '2'):
             resultPesquisaProd(3, 'na descrição', cid)
         elif (opcao == '3'):
+            produto = reconhecerObjetoImagem()
+            if produto:
+                resultPesquisaProd(3, 'na descrição', cid, IA=produto)
+        elif (opcao == '4'):
             verMaisPesquisados()
         elif (opcao == '0'):
             break
         else:
             erro('Opcao invalida.')
 
-def resultPesquisaProd(campo, prompt, cid):
+def resultPesquisaProd(campo, prompt, cid, IA=''):
     codigos = dict()
-    busca = str(input(f'\nPesquisando {prompt}: ').lower())
+    if (IA != ''):
+        busca = IA
+    else:
+        busca = str(input(f'\nPesquisando {prompt}: ').lower())
     retorna = False
     if (busca != ''):
         while True:
@@ -292,3 +304,74 @@ def finalizaPedido(cid, unico):
                         break
             break
     aviso(f'Pedido código {nid} finalizado com sucesso.')
+
+def selecionaImagem():
+    try:
+        app = QApplication(sys.argv)
+        dialog = QFileDialog()
+        dialog.setFileMode(QFileDialog.ExistingFile)
+        dialog.setNameFilter("Imagens (*.jpg *.jpeg)")
+        if dialog.exec_():
+            caminho_imagem = dialog.selectedFiles()[0]
+            return caminho_imagem
+        return None
+    except:
+        return None
+
+def traduzObjeto(nomeObjeto):
+    try:
+        if nomeObjeto:
+            if nomeObjeto == '"banana",':
+                return 'Banana'
+            elif nomeObjeto == '"orange",':
+                return 'Laranja'
+            elif nomeObjeto == '"strawberry",':
+                return 'Morango'
+            elif nomeObjeto == '"pineapple",':
+                return 'Abacaxi'
+            elif nomeObjeto == '"meatloaf",':
+                return 'Carne'
+            elif nomeObjeto == '"desktop computer",':
+                return 'Computador'
+            elif nomeObjeto == '"notebook computer",':
+                return 'Notebook'
+            elif nomeObjeto == '"electric fan",':
+                return 'Ventilador'
+            elif nomeObjeto == '"mobile phone",':
+                return 'Celular'
+            else:
+                erro(f'Esse objeto não foi traduzido, o nome retornado é esse: {nomeObjeto}')
+                return nomeObjeto
+        else:
+            return None
+    except:
+        return None
+
+def reconhecerObjetoImagem():
+    try:
+        caminhoImagem = selecionaImagem()
+        if caminhoImagem:
+            modelo = models.resnet50(weights='ResNet50_Weights.DEFAULT')
+            modelo.eval()
+            transform = transforms.Compose([
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            ])
+            imagem = Image.open(caminhoImagem)
+            imagem = transform(imagem)
+            imagem = imagem.unsqueeze(0)
+            with torch.no_grad():
+                saida = modelo(imagem)
+            with open("classes.txt", "r") as f:
+                classes = [linha.strip() for linha in f.readlines()]
+            pontuacao, indice = torch.max(saida, 1)
+            nomeObjeto = classes[indice.item()]
+            traduzido = traduzObjeto(nomeObjeto)
+            return traduzido.lower()
+        else:
+            return None
+    except:
+        erro('Ocorreu algum erro no sistema de pesquisa por imagem.')
+        return None
