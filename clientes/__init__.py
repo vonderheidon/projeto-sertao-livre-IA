@@ -340,7 +340,7 @@ def traduzObjeto(nomeObjeto):
             elif nomeObjeto == '"mobile phone",':
                 return 'Celular'
             else:
-                erro(f'Esse objeto não foi traduzido, o nome retornado é esse: {nomeObjeto}')
+                print(f'\n{CRED}Esse objeto não foi traduzido, o nome retornado é esse: {nomeObjeto}{CEND}')
                 return nomeObjeto
         else:
             return None
